@@ -1,7 +1,7 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 
-# Object Tracker program : a tool to track an object of a specified color with a camera.
+# Object Tracker program version 1.0 : a tool to track an object of a specified color with a camera.
 # Copyright (C) 2017  Vanessa Dan, Eve Machefert and Alix Plamont
 #
 # This program is free software: you can redistribute it and/or modify

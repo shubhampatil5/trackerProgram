@@ -1,4 +1,4 @@
-# trackerProgram
+# trackerProgram version 1.0
 A tool to track any object of a certain color with a camera, displaying a square on aimed object.
 
 It was designed to be a tool to configure some program which needs to track an specified object with a camera.
