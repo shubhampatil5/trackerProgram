@@ -7,4 +7,6 @@ of a certain color and use this program to configure his instrument.
 That's why, in future updates, this program will save user's setting in a file which will be used
 by theremin's program.
 
+The program is achieved with Python 2.7.13, using OpenCV 3.2.0 and PyQt 4.8.7.
+
 We are Vanessa Dan, Eve Machefert and Alix Plamont, french students working on this school project.
