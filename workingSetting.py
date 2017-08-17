@@ -1,7 +1,7 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 
-# Object Tracker program : a tool to track an object with a specified color with a camera.
+# Object Tracker program : a tool to track an object of a specified color with a camera.
 # Copyright (C) 2017  Vanessa Dan, Eve Machefert and Alix Plamont
 #
 # This program is free software: you can redistribute it and/or modify
@@ -20,10 +20,14 @@
 # To contact us: <alix.plamont@etu.upmc.fr>.
 
 # This file is the main python file of this program.
-# This program track an object with a particular color with a camera, displaying a square on tracked object.
-# It was designed to be a tool in order to configure some program which needs to track an specified object with a camera.
-# Our project is to use it for creating a 'numeric theremin' : theremin's user will put gloves with a certain color and use this program to configure his instrument. 
-# That's why, in future updates, this program will save user's settings in a file which will be used by theremin's program.
+# This program tracks an object of a particular color with a camera,
+# displaying a square on tracked object.
+# It was designed to be a tool to configure some program which needs to track
+# an specified object with a camera.
+# Our project is to use it for creating a 'numeric theremin' : theremin's user will put gloves
+# of a certain color and use this program to configure his instrument.
+# That's why, in future updates, this program will save user's setting in a file which will be used
+# by theremin's program.
 
 from functools import reduce
 import numpy
@@ -38,7 +42,7 @@ from TrackingGUI import UiSetting
 class DisplayThread(QtCore.QThread):
 	"""This class is a QThread designed to relieve the main thread for frame rendering computations.
 
-	It provides the current filtred frame in the form of a QImage to the main thread
+	It provides the current filtered frame in the form of a QImage to the main thread
 	and also computes the barycentre's coordinates.
 	OpenCV module is used for video capture and frame rendering.
 	"""
@@ -48,7 +52,7 @@ class DisplayThread(QtCore.QThread):
 		It subclass QThread and defines :
 		- bounds used to filter video colors ;
 		- an attribute to set the precision of barycentre computation ;
-		- cam object ;
+		- the cam object ;
 		- attributes for frame resolution.
 		"""
 		super(DisplayThread, self).__init__()
@@ -89,19 +93,19 @@ class DisplayThread(QtCore.QThread):
 	def barycentre(self, image):
 		"""Returns the barycentre of non-null pixels.
 
-		The third value returned is a bool that indicate if there's non-null pixels.
-		Because colors filtering will only keep non-null pixels from the aimed object,
-		compute their barycentre is a good way to track an object with a particulary color.
+		The third value returned is a bool that indicates if there are non-null pixels.
+		Because colors filtering will only keeps non-null pixels from the aimed object,
+		compute their barycentre is a good way to track an object of a particular color.
 		To make the computing faster, the image given in arg is resized smaller.
 		"""
-		L0 = image[:, :, 0].nonzero() #lists of coordinates of pixels which have a non-zero R (then G, then B) value
-		L1 = image[:, :, 1].nonzero() 
+		L0 = image[:, :, 0].nonzero() #lists of coordinates of pixels
+		L1 = image[:, :, 1].nonzero() #which have a non-zero R (then G, then B) value
 		L2 = image[:, :, 2].nonzero() 
-		LY = reduce(numpy.intersect1d, (L0[0], L1[0], L2[0])) #lists of ordinates and abscissa of non-zeros pixels
-		LX = reduce(numpy.intersect1d, (L0[1], L1[1], L2[1]))
+		LY = reduce(numpy.intersect1d, (L0[0], L1[0], L2[0])) #lists of ordinates and abscissa
+		LX = reduce(numpy.intersect1d, (L0[1], L1[1], L2[1])) #of non-zeros pixels
 		nY = float(len(LY)) #to avoid Euclidean division
 		nX = float(len(LX))
-		f = 100./self.precisionT #to accord resized image's barycentre with full size image
+		f = 100. / self.precisionT #to accord resized image's barycentre with full size image
 		try:
 			return int(f * numpy.sum(LX) / nX + 0.5), int(f * numpy.sum(LY) / nY + 0.5), True
 		except ZeroDivisionError:
@@ -109,11 +113,14 @@ class DisplayThread(QtCore.QThread):
 
 
 	def run(self):
-		"""Func ran when the thread is started. In an infinite loop, it emits signals to the main thread carrying rendered QImage, barycentre coordinates and the bool from barycentre func.
+		"""Func ran when the thread is started. Through an infinite loop,
+		it emits signals carrying rendered QImage, barycentre coordinates
+		and the bool from barycentre func to the main thread.
 
-		It uses cv2 methods to filter frame's colors before make an array-to-QImage conversion.
-		The precision attribute set in the GUI by the user is, in percents, the size of the resized frame in relation to his original size.
-		The resized frame is given to barycentre func.
+		It uses openCV (cv2) methods to filter frame's colors and then performs an array-to-QImage conversion.
+		The precision attribute set in the GUI by the user is,
+		in percents, the size of the resized frame in relation to initial frame size.
+		This is this resized frame which is given to the barycentre func.
 		"""
 		while True:
 			_, frame = self.cam.read()
@@ -126,7 +133,7 @@ class DisplayThread(QtCore.QThread):
 
 			mask = cv2.inRange(hsv, lowerColor, upperColor)
 			res = cv2.bitwise_and(frame, frame, mask=mask)
-			resizedRes = cv2.resize(res, (0,0), fx=self.precisionT / 100., fy=self.precisionT / 100.)
+			resizedRes = cv2.resize(res, (0,0), fx=self.precisionT/100., fy=self.precisionT/100.)
 
 			qImg = QtGui.QImage(res.data, self.w, self.h, QtGui.QImage.Format_RGB888)
 			bary = self.barycentre(resizedRes)
@@ -135,7 +142,7 @@ class DisplayThread(QtCore.QThread):
 
 
 class WorkingSetting(QtGui.QMainWindow, UiSetting):
-	"""This is the working part of the Setting UI.
+	"""This is the working part of the program, making the GUI work.
 
 	This class contains all methods used to set the color filter,
 	it displays the computed barycente on a little green square.
@@ -144,11 +151,13 @@ class WorkingSetting(QtGui.QMainWindow, UiSetting):
 	def __init__(self):
 		"""WorkingSetting class' constructor. Makes usable the GUI.
 
-		It subclass QMainWindow and UiSetting, shows the UI, connects the UI's widgets to WorkingSetting methods and defines some attributes :
-		- bounds given to the thread in order to filter colors, set by sliders (are ranged in [|0,255|] integers intervall) ;
-		- precision attribute given to the thread to set the precision of barycentre computing ;
-		- a bool used to know if used had applied his settings ;
-		- a default black QImage displayed when barycentre func of the thread return False.
+		It subclass QMainWindow and UiSetting, shows the UI,
+		connects the UI's widgets to WorkingSetting methods and defines some attributes :
+		- bounds given to the thread in order to filter colors,
+		set by sliders (are ranged in [|0,255|] integers intervall) ;
+		- precision attribute given to the thread to set the precision of barycentre computation ;
+		- a bool used to know if the user has applied his setting ;
+		- a default black QImage displayed when the barycentre func from the thread returns False.
 		It also connects the display func with thread's signal and starts it.
 		"""
 		super(WorkingSetting, self).__init__()
@@ -234,7 +243,8 @@ class WorkingSetting(QtGui.QMainWindow, UiSetting):
 
 		It converts QImage received in QPixmap in order to display it in the QGraphicsScene object of the GUI,
 		provides sliders' values to the thread and displays its rendered images if barycentre func wants it.
-		In the case where a barycentre had been computed, a green square locate his position. Its size depends of the set precision.
+		In the case where a barycentre has been computed, a green square locates his position.
+		Its size depends of the set precision.
 		"""
 		currentFrame = QtGui.QPixmap.fromImage(qImg)
 		self.displaying.getValues(self.hMin, self.hMax, self.sMin, self.sMax, self.vMin, self.vMax, self.precision)
@@ -244,8 +254,9 @@ class WorkingSetting(QtGui.QMainWindow, UiSetting):
 			self.graphicsScene.addPixmap(currentFrame)
 			self.graphicsView.fitInView(QtCore.QRectF(0,0,640,480), QtCore.Qt.KeepAspectRatio)
 
-			squareSide = 400 / self.precision #the square side would be equal to 4px if a full sized frame were given to barycentre func
-			self.graphicsScene.addRect(QtCore.QRectF(bx - squareSide / 2, by - squareSide / 2, squareSide, squareSide), QtGui.QPen(QtCore.Qt.green), QtGui.QBrush(QtCore.Qt.green))
+			squareSide = 400 / self.precision #would be equal to 4px if a full sized frame were given to barycentre func
+			squareDims = QtCore.QRectF(bx - squareSide / 2, by - squareSide / 2, squareSide, squareSide)
+			self.graphicsScene.addRect(squareDims, QtGui.QPen(QtCore.Qt.green), QtGui.QBrush(QtCore.Qt.green))
 		else:
 			self.graphicsScene.addPixmap(self.blackQPixmap)
 			self.graphicsView.fitInView(QtCore.QRectF(0,0,640,480), QtCore.Qt.KeepAspectRatio)
@@ -258,9 +269,10 @@ class WorkingSetting(QtGui.QMainWindow, UiSetting):
 
 
 	def closeEvent(self, event):
-		"""Func overriding the closeEvent func inherited from QWidget. It is called when the user push the close button (X button) of the window.
+		"""Func overriding the closeEvent func inherited from QWidget.
+		It is called when the user push the close button (X button) on the window.
 
-		It takes care the user has good applied his settings asking a question if not.
+		It takes care the user has well applied his setting, asking a question if not.
 		Moreover it kills the thread, breaking its infinite loop, before to quit.
 		"""
 		if self.isApplied:
@@ -285,7 +297,7 @@ class WorkingSetting(QtGui.QMainWindow, UiSetting):
 
 
 def main():
-	"""Run the whole application.
+	"""To run the whole application.
 	"""
 	import sys
 	app = QtGui.QApplication(sys.argv)
