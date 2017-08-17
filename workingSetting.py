@@ -1,7 +1,7 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 
-# Object Tracker program version 1.0 : a tool to track an object of a specified color with a camera.
+# Object Tracker program version 1.1 : a tool to track an object of a specified color with a camera.
 # Copyright (C) 2017  Vanessa Dan, Eve Machefert and Alix Plamont
 #
 # This program is free software: you can redistribute it and/or modify
@@ -29,7 +29,11 @@
 # That's why, in future updates, this program will save user's setting in a file which will be used
 # by theremin's program.
 
+# This version allows the program to save sliders values in a file. If the user applied his setting,
+# he will refind it when he will re-execute the program.
+
 from functools import reduce
+import pickle
 import numpy
 
 from PyQt4 import QtCore, QtGui
@@ -50,22 +54,10 @@ class DisplayThread(QtCore.QThread):
 		"""Displaying class' constructor.
 
 		It subclass QThread and defines :
-		- bounds used to filter video colors ;
-		- an attribute to set the precision of barycentre computation ;
 		- the cam object ;
 		- attributes for frame resolution.
 		"""
 		super(DisplayThread, self).__init__()
-
-		#hsv format is used to filter colors
-		self.hMinT = 0
-		self.hMaxT = 255
-		self.sMinT = 0
-		self.sMaxT = 255
-		self.vMinT = 0
-		self.vMaxT = 255
-
-		self.precisionT = 40
 
 		self.cam = cv2.VideoCapture(0)
 		_, frame = self.cam.read() #frame sample to take resolution
@@ -80,6 +72,9 @@ class DisplayThread(QtCore.QThread):
 
 	def getValues(self, hmin, hmax, smin, smax, vmin, vmax, prec):
 		"""Func used to synchronize bounds and precision with values of GUI's sliders.
+
+		Precision attribute is used to make the barycentre computation faster,
+		see run func doc for more details.
 		"""
 		self.hMinT = hmin
 		self.hMaxT = hmax
@@ -155,10 +150,17 @@ class WorkingSetting(QtGui.QMainWindow, UiSetting):
 		connects the UI's widgets to WorkingSetting methods and defines some attributes :
 		- bounds given to the thread in order to filter colors,
 		set by sliders (are ranged in [|0,255|] integers intervall) ;
-		- precision attribute given to the thread to set the precision of barycentre computation ;
+		- precision attribute given to the thread to set the precision of barycentre computation 
+		(ranged in [|10,90|] integers intervall) ;
 		- a bool used to know if the user has applied his setting ;
 		- a default black QImage displayed when the barycentre func from the thread returns False.
-		It also connects the display func with thread's signal and starts it.
+		It also connects the display func with thread's signal,
+		gives it initials bounds and precision values and starts it.
+
+		The initials values of bounds and precision attribute are, if the user applied his setting,
+		the previous set values. If the user never applied or the file used to save were deleted,
+		default values are given : 0 for lower boundaries, 255 for upper boundaries,
+		and 40 for the precision.
 		"""
 		super(WorkingSetting, self).__init__()
 		self.setupUi(self)
@@ -173,14 +175,30 @@ class WorkingSetting(QtGui.QMainWindow, UiSetting):
 		self.resetBtn.clicked.connect(self.resetFilter)
 		self.applyBtn.clicked.connect(self.applyFunc)
 
-		self.hMin = 0
-		self.hMax = 255
-		self.sMin = 0
-		self.sMax = 255
-		self.vMin = 0
-		self.vMax = 255
+		try:
+			with open('savedSetting', 'rb') as savingFile:
+				savingFileUnpickler = pickle.Unpickler(savingFile)				
+				self.initList = savingFileUnpickler.load()
+		except IOError:
+			self.initList = [0, 255, 0, 255, 0, 255, 40]
 
-		self.precision = 40
+		#hsv format is used to filter colors
+		self.hMin = self.initList[0]
+		self.hMax = self.initList[1]
+		self.sMin = self.initList[2]
+		self.sMax = self.initList[3]
+		self.vMin = self.initList[4]
+		self.vMax = self.initList[5]
+
+		self.precision = self.initList[6]
+
+		self.hMinSlider.setValue(self.initList[0])
+		self.hMaxSlider.setValue(self.initList[1])
+		self.sMinSlider.setValue(self.initList[2])
+		self.sMaxSlider.setValue(self.initList[3])
+		self.vMinSlider.setValue(self.initList[4])
+		self.vMaxSlider.setValue(self.initList[5])
+		self.precisionSlider.setValue(self.initList[6])
 
 		self.isApplied = False
 
@@ -188,6 +206,7 @@ class WorkingSetting(QtGui.QMainWindow, UiSetting):
 		self.blackQPixmap.fill(QtCore.Qt.black)
 
 		self.displaying = DisplayThread()
+		self.displaying.getValues(self.hMin, self.hMax, self.sMin, self.sMax, self.vMin, self.vMax, self.precision)
 		self.connect(self.displaying, QtCore.SIGNAL('refreshFrame(QImage, int, int, bool)'), self.displayFunc)
 		self.displaying.start()
 
@@ -265,6 +284,10 @@ class WorkingSetting(QtGui.QMainWindow, UiSetting):
 
 
 	def applyFunc(self):
+		with open('savedSetting', 'wb') as savingFile:
+			savingFilePickler = pickle.Pickler(savingFile)
+			L = [self.hMin, self.hMax, self.sMin, self.sMax, self.vMin, self.vMax, self.precision]			
+			savingFilePickler.dump(L)
 		self.isApplied = True
 
 
@@ -273,9 +296,12 @@ class WorkingSetting(QtGui.QMainWindow, UiSetting):
 		It is called when the user push the close button (X button) on the window.
 
 		It takes care the user has well applied his setting, asking a question if not.
-		Moreover it kills the thread, breaking its infinite loop, before to quit.
+		If the user has kept initial sliders values, no question is asked.
+		Moreover this func kills the thread on exit, breaking its infinite loop.
 		"""
-		if self.isApplied:
+		L = [self.hMin, self.hMax, self.sMin, self.sMax, self.vMin, self.vMax, self.precision]
+
+		if self.isApplied or self.initList == L:
 			self.displaying.exit()
 			event.accept()
 		else:
