@@ -150,7 +150,7 @@ class WorkingSetting(QtGui.QMainWindow, UiSetting):
 		connects the UI's widgets to WorkingSetting methods and defines some attributes :
 		- bounds given to the thread in order to filter colors,
 		set by sliders (are ranged in [|0,255|] integers intervall) ;
-		- precision attribute given to the thread to set the precision of barycentre computation 
+		- precision attribute given to the thread to set the precision of barycentre computation
 		(ranged in [|10,90|] integers intervall) ;
 		- a bool used to know if the user has applied his setting ;
 		- a default black QImage displayed when the barycentre func from the thread returns False.
@@ -176,7 +176,7 @@ class WorkingSetting(QtGui.QMainWindow, UiSetting):
 		self.applyBtn.clicked.connect(self.applyFunc)
 
 		try:
-			with open('savedSetting', 'rb') as savingFile:
+			with open('savedSetting', 'r') as savingFile:
 				savingFileUnpickler = pickle.Unpickler(savingFile)				
 				self.initList = savingFileUnpickler.load()
 		except IOError:
@@ -284,7 +284,7 @@ class WorkingSetting(QtGui.QMainWindow, UiSetting):
 
 
 	def applyFunc(self):
-		with open('savedSetting', 'wb') as savingFile:
+		with open('savedSetting', 'w') as savingFile:
 			savingFilePickler = pickle.Pickler(savingFile)
 			L = [self.hMin, self.hMax, self.sMin, self.sMax, self.vMin, self.vMax, self.precision]			
 			savingFilePickler.dump(L)
