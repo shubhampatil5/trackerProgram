@@ -33,6 +33,7 @@
 # he will refind it when he will re-execute the program.
 
 from functools import reduce
+import time
 import pickle
 import numpy
 
@@ -55,13 +56,16 @@ class DisplayThread(QtCore.QThread):
 
 		It subclass QThread and defines :
 		- the cam object ;
-		- attributes for frame resolution.
+		- attributes for frame resolution ;
+		- a bool for the run func's loop, used to stop video capture.
 		"""
 		super(DisplayThread, self).__init__()
 
 		self.cam = cv2.VideoCapture(0)
 		_, frame = self.cam.read() #frame sample to take resolution
 		self.w, self.h = frame.shape[1], frame.shape[0]
+
+		self.isRunning = True
 
 
 	def __del__(self):
@@ -83,6 +87,14 @@ class DisplayThread(QtCore.QThread):
 		self.vMinT = vmin
 		self.vMaxT = vmax
 		self.precisionT = prec
+
+
+	def stopCapture(self):
+		"""Func used to stop video capture and then release the camera.
+
+		See run func doc for more details.
+		"""
+		self.isRunning = False
 
 
 	def barycentre(self, image):
@@ -108,7 +120,7 @@ class DisplayThread(QtCore.QThread):
 
 
 	def run(self):
-		"""Func ran when the thread is started. Through an infinite loop,
+		"""Func ran when the thread is started. Through a loop,
 		it emits signals carrying rendered QImage, barycentre coordinates
 		and the bool from barycentre func to the main thread.
 
@@ -116,8 +128,9 @@ class DisplayThread(QtCore.QThread):
 		The precision attribute set in the GUI by the user is,
 		in percents, the size of the resized frame in relation to initial frame size.
 		This is this resized frame which is given to the barycentre func.
+		When the loop is stopped (when stopCapture() method is called), this func release the camera.
 		"""
-		while True:
+		while self.isRunning:
 			_, frame = self.cam.read()
 
 			frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
@@ -133,6 +146,8 @@ class DisplayThread(QtCore.QThread):
 			qImg = QtGui.QImage(res.data, self.w, self.h, QtGui.QImage.Format_RGB888)
 			bary = self.barycentre(resizedRes)
 			self.emit(QtCore.SIGNAL('refreshFrame(QImage, int, int, bool)'), qImg, bary[0], bary[1], bary[2])
+
+		self.cam.release()
 
 
 
@@ -284,6 +299,8 @@ class WorkingSetting(QtGui.QMainWindow, UiSetting):
 
 
 	def applyFunc(self):
+		"""Saves user's setting in a file, in the form of python list.
+		"""
 		with open('savedSetting', 'w') as savingFile:
 			savingFilePickler = pickle.Pickler(savingFile)
 			L = [self.hMin, self.hMax, self.sMin, self.sMax, self.vMin, self.vMax, self.precision]			
@@ -297,11 +314,14 @@ class WorkingSetting(QtGui.QMainWindow, UiSetting):
 
 		It takes care the user has well applied his setting, asking a question if not.
 		If the user has kept initial sliders values, no question is asked.
-		Moreover this func kills the thread on exit, breaking its infinite loop.
+		Moreover this func kills the thread on exit, stopping its loop
+		and releasing the camera.
 		"""
 		L = [self.hMin, self.hMax, self.sMin, self.sMax, self.vMin, self.vMax, self.precision]
 
 		if self.isApplied or self.initList == L:
+			self.displaying.stopCapture()
+			time.sleep(0.1) #to allow camera releasing
 			self.displaying.exit()
 			event.accept()
 		else:
@@ -313,9 +333,13 @@ class WorkingSetting(QtGui.QMainWindow, UiSetting):
 
 			if reply == QtGui.QMessageBox.Yes:
 				self.applyFunc()
+				self.displaying.stopCapture()
+				time.sleep(0.1)
 				self.displaying.exit()
 				event.accept()
 			elif reply == QtGui.QMessageBox.No:
+				self.displaying.stopCapture()
+				time.sleep(0.1)
 				self.displaying.exit()
 				event.accept()
 			else: event.ignore()
