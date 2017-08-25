@@ -41,7 +41,7 @@
 # The code also has a new structure : it is more divided in order to provide a good flexibility.
 # The old structure involved a fat main class (which was WorkingSetting). Now the main class,
 # DisplayFrames is not a subclass and is as big as the others. That reduces the number of self attributes
-# and make the code more flexible.
+# and makes the code more flexible.
 
 import time
 import pickle
