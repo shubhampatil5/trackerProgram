@@ -1,7 +1,7 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 
-# Object Tracker program version 1.1 : a tool to track an object of a specified color with a camera.
+# Object Tracker program version 1.2 : a tool to track an object of a specified color with a camera.
 # Copyright (C) 2017  Vanessa Dan, Eve Machefert and Alix Plamont
 #
 # This program is free software: you can redistribute it and/or modify
@@ -19,166 +19,56 @@
 #
 # To contact us: <alix.plamont@etu.upmc.fr>.
 
-# This file is the main python file of this program.
-# This program tracks an object of a particular color with a camera,
-# displaying a square on tracked object.
-# It was designed to be a tool to configure some program which needs to track
+# This program is a tool to track any object of a certain color with a camera,
+# displaying a square on aimed object.
+# It was designed to be a tool to configure any program which needs to track
 # an specified object with a camera.
-# Our project is to use it for creating a 'numeric theremin' : theremin's user will put gloves
-# of a certain color and use this program to configure his instrument.
-# That's why, in future updates, this program will save user's setting in a file which will be used
-# by theremin's program.
+# 
+# Our project is to use it for creating a 'numeric theremin'
+# (search www.google.com to learn what's a theremin) : theremin's player 
+# will wear gloves of a certain color and be allowed to play music,
+# moving his hands in front of his camera. Before, he will have to use this program
+# to set the instrument. That's why this program save user's setting in a file which
+# will be used by theremin's program.
+# 
+# This program is achieved with Python 2.7.13, using OpenCV 3.2.0 and PyQt 4.8.7.
+# 
+# We are Vanessa Dan, Eve Machefert and Alix Plamont, french students working on this school project.
 
-# This version allows the program to save sliders values in a file. If the user applied his setting,
-# he will refind it when he will re-execute the program.
+# This version implements a startup widget which allows the user to choose which camera he wants to use.
+# Thus, no or several cameras can be pluggeg without bug.
+#
+# The code also has a new structure : it is more divided in order to provide a good flexibility.
+# The old structure involved a fat main class (which was WorkingSetting). Now the main class,
+# DisplayFrames is not a subclass and is as big as the others. That reduces the number of self attributes
+# and makes the code more flexible.
 
-from functools import reduce
 import time
 import pickle
-import numpy
 
 from PyQt4 import QtCore, QtGui
-import cv2
 
 from TrackingGUI import UiSetting
-
-
-
-class DisplayThread(QtCore.QThread):
-	"""This class is a QThread designed to relieve the main thread for frame rendering computations.
-
-	It provides the current filtered frame in the form of a QImage to the main thread
-	and also computes the barycentre's coordinates.
-	OpenCV module is used for video capture and frame rendering.
-	"""
-	def __init__(self):
-		"""Displaying class' constructor.
-
-		It subclass QThread and defines :
-		- the cam object ;
-		- attributes for frame resolution ;
-		- a bool for the run func's loop, used to stop video capture.
-		"""
-		super(DisplayThread, self).__init__()
-
-		self.cam = cv2.VideoCapture(0)
-		_, frame = self.cam.read() #frame sample to take resolution
-		self.w, self.h = frame.shape[1], frame.shape[0]
-
-		self.isRunning = True
-
-
-	def __del__(self):
-		"""This func makes part of QThread's structure.
-		"""
-		self.wait()
-
-
-	def getValues(self, hmin, hmax, smin, smax, vmin, vmax, prec):
-		"""Func used to synchronize bounds and precision with values of GUI's sliders.
-
-		Precision attribute is used to make the barycentre computation faster,
-		see run func doc for more details.
-		"""
-		self.hMinT = hmin
-		self.hMaxT = hmax
-		self.sMinT = smin
-		self.sMaxT = smax
-		self.vMinT = vmin
-		self.vMaxT = vmax
-		self.precisionT = prec
-
-
-	def stopCapture(self):
-		"""Func used to stop video capture and then release the camera.
-
-		See run func doc for more details.
-		"""
-		self.isRunning = False
-
-
-	def barycentre(self, image):
-		"""Returns the barycentre of non-null pixels.
-
-		The third value returned is a bool that indicates if there are non-null pixels.
-		Because colors filtering will only keeps non-null pixels from the aimed object,
-		compute their barycentre is a good way to track an object of a particular color.
-		To make the computing faster, the image given in arg is resized smaller.
-		"""
-		L0 = image[:, :, 0].nonzero() #lists of coordinates of pixels
-		L1 = image[:, :, 1].nonzero() #which have a non-zero R (then G, then B) value
-		L2 = image[:, :, 2].nonzero() 
-		LY = reduce(numpy.intersect1d, (L0[0], L1[0], L2[0])) #lists of ordinates and abscissa
-		LX = reduce(numpy.intersect1d, (L0[1], L1[1], L2[1])) #of non-zeros pixels
-		nY = float(len(LY)) #to avoid Euclidean division
-		nX = float(len(LX))
-		f = 100. / self.precisionT #to accord resized image's barycentre with full size image
-		try:
-			return int(f * numpy.sum(LX) / nX + 0.5), int(f * numpy.sum(LY) / nY + 0.5), True
-		except ZeroDivisionError:
-			return 0, 0, False
-
-
-	def run(self):
-		"""Func ran when the thread is started. Through a loop,
-		it emits signals carrying rendered QImage, barycentre coordinates
-		and the bool from barycentre func to the main thread.
-
-		It uses openCV (cv2) methods to filter frame's colors and then performs an array-to-QImage conversion.
-		The precision attribute set in the GUI by the user is,
-		in percents, the size of the resized frame in relation to initial frame size.
-		This is this resized frame which is given to the barycentre func.
-		When the loop is stopped (when stopCapture() method is called), this func release the camera.
-		"""
-		while self.isRunning:
-			_, frame = self.cam.read()
-
-			frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-			hsv = cv2.cvtColor(frame, cv2.COLOR_RGB2HSV)
-
-			lowerColor = numpy.array([self.hMinT, self.sMinT, self.vMinT])
-			upperColor = numpy.array([self.hMaxT, self.sMaxT, self.vMaxT])
-
-			mask = cv2.inRange(hsv, lowerColor, upperColor)
-			res = cv2.bitwise_and(frame, frame, mask=mask)
-			resizedRes = cv2.resize(res, (0,0), fx=self.precisionT/100., fy=self.precisionT/100.)
-
-			qImg = QtGui.QImage(res.data, self.w, self.h, QtGui.QImage.Format_RGB888)
-			bary = self.barycentre(resizedRes)
-			self.emit(QtCore.SIGNAL('refreshFrame(QImage, int, int, bool)'), qImg, bary[0], bary[1], bary[2])
-
-		self.cam.release()
+from cameraThread import DisplayThread, WorkingCameraSetting
 
 
 
 class WorkingSetting(QtGui.QMainWindow, UiSetting):
-	"""This is the working part of the program, making the GUI work.
+	"""This is the class making usable the GUI.
 
-	This class contains all methods used to set the color filter,
-	it displays the computed barycente on a little green square.
-	Frame rendering and barycentre computation are achieved by a separated QThread.
+	This class contains all methods used to manage widgets ;
+	it also handles the file saving. 
+	When the user close the window, a signal is emitted
+	in order to connect it with a function from DisplayFrames class.
+	That allows a custom close.
 	"""
 	def __init__(self):
-		"""WorkingSetting class' constructor. Makes usable the GUI.
-
-		It subclass QMainWindow and UiSetting, shows the UI,
-		connects the UI's widgets to WorkingSetting methods and defines some attributes :
-		- bounds given to the thread in order to filter colors,
-		set by sliders (are ranged in [|0,255|] integers intervall) ;
-		- precision attribute given to the thread to set the precision of barycentre computation
-		(ranged in [|10,90|] integers intervall) ;
-		- a bool used to know if the user has applied his setting ;
-		- a default black QImage displayed when the barycentre func from the thread returns False.
-		It also connects the display func with thread's signal,
-		gives it initials bounds and precision values and starts it.
-
-		The initials values of bounds and precision attribute are, if the user applied his setting,
-		the previous set values. If the user never applied or the file used to save were deleted,
-		default values are given : 0 for lower boundaries, 255 for upper boundaries,
-		and 40 for the precision.
+		"""WorkingSetting class constructor.		
 		"""
 		super(WorkingSetting, self).__init__()
 		self.setupUi(self)
+		self.setAttribute(QtCore.Qt.WA_DeleteOnClose) #makes Qt delete the setting GUI when it's closed
+		self.initValues()
 
 		self.hMinSlider.valueChanged.connect(self.refreshHMin)
 		self.hMaxSlider.valueChanged.connect(self.refreshHMax)
@@ -190,6 +80,15 @@ class WorkingSetting(QtGui.QMainWindow, UiSetting):
 		self.resetBtn.clicked.connect(self.resetFilter)
 		self.applyBtn.clicked.connect(self.applyFunc)
 
+		self.isApplied = False
+
+
+	def initValues(self):
+		"""This function initializes the values of the bounds (and the values
+		of the sliders used to move the bounds) used to filter frame's colors.
+
+		If there's already a saved file, the bounds pick up their old values.
+		"""
 		try:
 			with open('savedSetting', 'r') as savingFile:
 				savingFileUnpickler = pickle.Unpickler(savingFile)				
@@ -204,7 +103,6 @@ class WorkingSetting(QtGui.QMainWindow, UiSetting):
 		self.sMax = self.initList[3]
 		self.vMin = self.initList[4]
 		self.vMax = self.initList[5]
-
 		self.precision = self.initList[6]
 
 		self.hMinSlider.setValue(self.initList[0])
@@ -214,16 +112,6 @@ class WorkingSetting(QtGui.QMainWindow, UiSetting):
 		self.vMinSlider.setValue(self.initList[4])
 		self.vMaxSlider.setValue(self.initList[5])
 		self.precisionSlider.setValue(self.initList[6])
-
-		self.isApplied = False
-
-		self.blackQPixmap = QtGui.QPixmap(640,480)
-		self.blackQPixmap.fill(QtCore.Qt.black)
-
-		self.displaying = DisplayThread()
-		self.displaying.getValues(self.hMin, self.hMax, self.sMin, self.sMax, self.vMin, self.vMax, self.precision)
-		self.connect(self.displaying, QtCore.SIGNAL('refreshFrame(QImage, int, int, bool)'), self.displayFunc)
-		self.displaying.start()
 
 
 	def refreshHMin(self):
@@ -272,34 +160,8 @@ class WorkingSetting(QtGui.QMainWindow, UiSetting):
 		self.precisionSlider.setValue(40)
 
 
-	def displayFunc(self, qImg, bx, by, isOk):
-		"""Func communicating with the thread to display rendering frames.
-
-		It converts QImage received in QPixmap in order to display it in the QGraphicsScene object of the GUI,
-		provides sliders' values to the thread and displays its rendered images if barycentre func wants it.
-		In the case where a barycentre has been computed, a green square locates his position.
-		Its size depends of the set precision.
-		"""
-		currentFrame = QtGui.QPixmap.fromImage(qImg)
-		self.displaying.getValues(self.hMin, self.hMax, self.sMin, self.sMax, self.vMin, self.vMax, self.precision)
-		self.graphicsScene.clear()
-
-		if isOk:
-			self.graphicsScene.addPixmap(currentFrame)
-			self.graphicsView.fitInView(QtCore.QRectF(0,0,640,480), QtCore.Qt.KeepAspectRatio)
-
-			squareSide = 400 / self.precision #would be equal to 4px if a full sized frame were given to barycentre func
-			squareDims = QtCore.QRectF(bx - squareSide / 2, by - squareSide / 2, squareSide, squareSide)
-			self.graphicsScene.addRect(squareDims, QtGui.QPen(QtCore.Qt.green), QtGui.QBrush(QtCore.Qt.green))
-		else:
-			self.graphicsScene.addPixmap(self.blackQPixmap)
-			self.graphicsView.fitInView(QtCore.QRectF(0,0,640,480), QtCore.Qt.KeepAspectRatio)
-
-		self.graphicsScene.update()
-
-
 	def applyFunc(self):
-		"""Saves user's setting in a file, in the form of python list.
+		"""Saves user's settings in a file, in the form of a python list.
 		"""
 		with open('savedSetting', 'w') as savingFile:
 			savingFilePickler = pickle.Pickler(savingFile)
@@ -308,38 +170,159 @@ class WorkingSetting(QtGui.QMainWindow, UiSetting):
 		self.isApplied = True
 
 
-	def closeEvent(self, event):
-		"""Func overriding the closeEvent func inherited from QWidget.
-		It is called when the user push the close button (X button) on the window.
-
-		It takes care the user has well applied his setting, asking a question if not.
-		If the user has kept initial sliders values, no question is asked.
-		Moreover this func kills the thread on exit, stopping its loop
-		and releasing the camera.
+	def isOkToClose(self):
+		"""On exit, if the user saved his settings or didn't modify nothing, returns True.
+		Else returns False.
 		"""
 		L = [self.hMin, self.hMax, self.sMin, self.sMax, self.vMin, self.vMax, self.precision]
+		return self.isApplied or self.initList == L
 
-		if self.isApplied or self.initList == L:
+
+	def drawQuitMsg(self):
+		"""Provides the message drawn when isOkToClose returns False.
+		"""
+		quitMsg = 'Would you like to apply your setting?'
+		msgBox = QtGui.QMessageBox(QtGui.QMessageBox.Question, 'Save?', quitMsg, QtGui.QMessageBox.Yes|QtGui.QMessageBox.No|QtGui.QMessageBox.Cancel)
+		msgBox.setWindowFlags(QtCore.Qt.CustomizeWindowHint|QtCore.Qt.WindowTitleHint)
+		return msgBox.exec_()
+
+	def closeEvent(self, event):
+		"""Overidde QWidget closeEvent function in order to make a custom quit().
+		"""
+		self.emit(QtCore.SIGNAL('closeSettingGUI(QCloseEvent)'), event)
+
+
+
+class DisplayFrames():
+	"""Thiss class is the main class of this tool. It manages the other classes
+	and provides methods to control camera settings and frame displaying.
+
+	It handles all the display part of this program, from cameras to drawing on GUI.
+	Several QObjects are connected to its functions.
+	"""
+	def __init__(self, RESPONSE_TIME=0.25):
+		"""DisplayFrames class constructor. Makes connections with QObjects.
+
+		The optional argument is the waiting period (in seconds) during
+		which a camera is called, used or released. This delay avoids OpenCV
+		errors about the camera.
+		"""
+		self.CAM_RESPONSE_TIME = RESPONSE_TIME
+
+		self.mainWorkingGUI = WorkingSetting()
+		self.mainWorkingGUI.connect(self.mainWorkingGUI, QtCore.SIGNAL('closeSettingGUI(QCloseEvent)'), self.closeEvent) #the closeEvent
+
+		self.blackQPixmap = QtGui.QPixmap(640, 480)  #A default black QPixmap is defined here in order
+		self.blackQPixmap.fill(QtCore.Qt.black)                #to display it when no barycentre can be computed.
+
+		self.cameraUI = WorkingCameraSetting(self.CAM_RESPONSE_TIME)
+		self.cameraUI.connect(self.cameraUI.cameraChoice, QtCore.SIGNAL('activated(int)'), self.changeCamIndex) #the drop-down box
+		self.cameraUI.refreshBtn.clicked.connect(self.refreshCameras)
+		self.cameraUI.OKBtn.clicked.connect(self.applyCameraSetting)
+
+		self.displaying = DisplayThread(self.CAM_RESPONSE_TIME)
+		self.displaying.getValues(self.mainWorkingGUI.hMin, self.mainWorkingGUI.hMax, self.mainWorkingGUI.sMin, self.mainWorkingGUI.sMax, self.mainWorkingGUI.vMin, self.mainWorkingGUI.vMax, self.mainWorkingGUI.precision)
+		self.displaying.connect(self.displaying, QtCore.SIGNAL('refreshFrame(QImage, int, int, bool)'), self.displayFunc)
+
+		self.initCam()
+
+
+	def initCam(self):
+		"""If that's possible, defines a camera on open.
+		"""
+		initIndex = self.cameraUI.cameraChoice.currentIndex()
+		if initIndex != -1:
+			self.displaying.defineCamera(initIndex)
+			self.displaying.startCapture()
+			self.displaying.start()
+
+
+	def refreshCameras(self):
+		"""Refreshes the list of plugged cameras,
+		taking care to interrupt displaying before.
+		"""
+		self.displaying.stopCapture()
+		time.sleep(self.CAM_RESPONSE_TIME)
+		try:
+			self.displaying.cam.release()
+		except AttributeError: pass
+		self.cameraUI.callCameraSetting()
+		self.initCam()
+
+
+	def changeCamIndex(self, index):
+		"""Function used to change the camera,
+		replacing it by the camera of index <index>.
+		"""
+		self.displaying.stopCapture()
+		time.sleep(self.CAM_RESPONSE_TIME)
+		self.displaying.defineCamera(index)
+		self.displaying.startCapture()
+		self.displaying.start()
+
+
+	def applyCameraSetting(self):
+		"""Called when OK button from camera widget is pushed.
+
+		If no camera was detected, it closes all.
+		Else it destroys the widget.
+		"""
+		if self.cameraUI.cameraChoice.currentIndex() == -1:
+			print 'A camera must be plugged to make the program start.'
+			self.mainWorkingGUI.close()
+			self.cameraUI.close()
+		else: self.cameraUI.close()
+
+
+	def displayFunc(self, qImg, bx, by, isOk):
+		"""Func communicating with the thread to display rendering frames.
+
+		It converts QImage received in QPixmap in order to display it in the
+		QGraphicsScene object of the main GUI,
+		provides sliders' values to the thread and displays its rendered images
+		if barycentre function wants it.
+		In the case where a barycentre has been computed, a green square locates his position.
+		Its size depends of the set precision.
+		"""
+		currentFrame = QtGui.QPixmap.fromImage(qImg)
+		self.displaying.getValues(self.mainWorkingGUI.hMin, self.mainWorkingGUI.hMax, self.mainWorkingGUI.sMin, self.mainWorkingGUI.sMax, self.mainWorkingGUI.vMin, self.mainWorkingGUI.vMax, self.mainWorkingGUI.precision)
+		self.mainWorkingGUI.graphicsScene.clear()
+
+		if isOk:
+			self.mainWorkingGUI.graphicsScene.addPixmap(currentFrame)
+			self.mainWorkingGUI.graphicsView.fitInView(QtCore.QRectF(0,0,640,480), QtCore.Qt.KeepAspectRatio)
+
+			squareSide = 400 / self.mainWorkingGUI.precision #would be equal to 4px if a full sized frame were given to barycentre func
+			squareDims = QtCore.QRectF(bx - squareSide / 2, by - squareSide / 2, squareSide, squareSide)
+			self.mainWorkingGUI.graphicsScene.addRect(squareDims, QtGui.QPen(QtCore.Qt.green), QtGui.QBrush(QtCore.Qt.green))
+		else:
+			self.mainWorkingGUI.graphicsScene.addPixmap(self.blackQPixmap)
+			self.mainWorkingGUI.graphicsView.fitInView(QtCore.QRectF(0,0,640,480), QtCore.Qt.KeepAspectRatio)
+
+		self.mainWorkingGUI.graphicsScene.update()
+
+
+	def closeEvent(self, event):
+		"""The custom close event. 
+		Asks the user to confirm the saving of his settings
+		and disconnect properly the camera.
+		"""
+		if self.mainWorkingGUI.isOkToClose():
 			self.displaying.stopCapture()
-			time.sleep(0.1) #to allow camera releasing
+			time.sleep(self.CAM_RESPONSE_TIME) #to allow camera releasing
 			self.displaying.exit()
 			event.accept()
 		else:
-			quitMsg = 'Would you like to apply your setting?'
-			msgBox = QtGui.QMessageBox(QtGui.QMessageBox.Question, 'Save?', quitMsg, QtGui.QMessageBox.Yes | QtGui.QMessageBox.No | QtGui.QMessageBox.Cancel)
-
-			msgBox.setWindowFlags(QtCore.Qt.CustomizeWindowHint | QtCore.Qt.WindowTitleHint)
-			reply = msgBox.exec_()
-
+			reply = self.mainWorkingGUI.drawQuitMsg()
 			if reply == QtGui.QMessageBox.Yes:
-				self.applyFunc()
+				self.mainWorkingGUI.applyFunc()
 				self.displaying.stopCapture()
-				time.sleep(0.1)
+				time.sleep(self.CAM_RESPONSE_TIME)
 				self.displaying.exit()
 				event.accept()
 			elif reply == QtGui.QMessageBox.No:
 				self.displaying.stopCapture()
-				time.sleep(0.1)
+				time.sleep(self.CAM_RESPONSE_TIME)
 				self.displaying.exit()
 				event.accept()
 			else: event.ignore()
@@ -351,8 +334,9 @@ def main():
 	"""
 	import sys
 	app = QtGui.QApplication(sys.argv)
-	win = WorkingSetting()
-	win.show()
+	win = DisplayFrames()
+	win.mainWorkingGUI.show()
+	win.cameraUI.show()
 	sys.exit(app.exec_())
 
 
