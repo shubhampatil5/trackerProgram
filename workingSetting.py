@@ -40,7 +40,7 @@
 #
 # The code also has a new structure : it is more divided in order to provide a good flexibility.
 # The old structure involved a fat main class (which was WorkingSetting). Now the main class,
-# DisplayFrames is not a subclass and is as big as the others. That reduces the number of self attributes
+# DisplayFrames is no more a subclass and is as big as the others. That reduces the number of self attributes
 # and makes the code more flexible.
 
 import time
@@ -58,7 +58,7 @@ class WorkingSetting(QtGui.QMainWindow, UiSetting):
 
 	This class contains all methods used to manage widgets ;
 	it also handles the file saving. 
-	When the user close the window, a signal is emitted
+	When the user closes the window, a signal is emitted
 	in order to connect it with a function from DisplayFrames class.
 	That allows a custom close.
 	"""
@@ -85,7 +85,7 @@ class WorkingSetting(QtGui.QMainWindow, UiSetting):
 
 	def initValues(self):
 		"""This function initializes the values of the bounds (and the values
-		of the sliders used to move the bounds) used to filter frame's colors.
+		of the sliders used to move the bounds) used to filter the frame's colors.
 
 		If there's already a saved file, the bounds pick up their old values.
 		"""
@@ -165,14 +165,15 @@ class WorkingSetting(QtGui.QMainWindow, UiSetting):
 		"""
 		with open('savedSetting', 'w') as savingFile:
 			savingFilePickler = pickle.Pickler(savingFile)
-			L = [self.hMin, self.hMax, self.sMin, self.sMax, self.vMin, self.vMax, self.precision]			
+			L = [self.hMin, self.hMax, self.sMin, self.sMax, self.vMin, self.vMax, self.precision]
 			savingFilePickler.dump(L)
 		self.isApplied = True
+		self.close()
 
 
 	def isOkToClose(self):
-		"""On exit, if the user saved his settings or didn't modify nothing, returns True.
-		Else returns False.
+		"""On exit, if the user has applied or didn't modify nothing, returns True.
+		Else, returns False.
 		"""
 		L = [self.hMin, self.hMax, self.sMin, self.sMax, self.vMin, self.vMax, self.precision]
 		return self.isApplied or self.initList == L
@@ -187,7 +188,7 @@ class WorkingSetting(QtGui.QMainWindow, UiSetting):
 		return msgBox.exec_()
 
 	def closeEvent(self, event):
-		"""Overidde QWidget closeEvent function in order to make a custom quit().
+		"""Overrides the QWidget closeEvent function in order to make a custom quit.
 		"""
 		self.emit(QtCore.SIGNAL('closeSettingGUI(QCloseEvent)'), event)
 
@@ -238,7 +239,7 @@ class DisplayFrames():
 
 
 	def refreshCameras(self):
-		"""Refreshes the list of plugged cameras,
+		"""Refreshes the list of the plugged cameras,
 		taking care to interrupt displaying before.
 		"""
 		self.displaying.stopCapture()
@@ -265,7 +266,7 @@ class DisplayFrames():
 		"""Called when OK button from camera widget is pushed.
 
 		If no camera was detected, it closes all.
-		Else it destroys the widget.
+		Else, it destroys the widget.
 		"""
 		if self.cameraUI.cameraChoice.currentIndex() == -1:
 			print 'A camera must be plugged to make the program start.'
@@ -275,14 +276,14 @@ class DisplayFrames():
 
 
 	def displayFunc(self, qImg, bx, by, isOk):
-		"""Func communicating with the thread to display rendering frames.
+		"""Function communicating with the thread to display rendering frames.
 
-		It converts QImage received in QPixmap in order to display it in the
-		QGraphicsScene object of the main GUI,
-		provides sliders' values to the thread and displays its rendered images
+		It converts the received QImage in a QPixmap in order to display it in the
+		QGraphicsScene object from the main GUI,
+		provides the sliders' values to the thread and displays its rendered images
 		if barycentre function wants it.
 		In the case where a barycentre has been computed, a green square locates his position.
-		Its size depends of the set precision.
+		Its size depends on the set precision.
 		"""
 		currentFrame = QtGui.QPixmap.fromImage(qImg)
 		self.displaying.getValues(self.mainWorkingGUI.hMin, self.mainWorkingGUI.hMax, self.mainWorkingGUI.sMin, self.mainWorkingGUI.sMax, self.mainWorkingGUI.vMin, self.mainWorkingGUI.vMax, self.mainWorkingGUI.precision)
@@ -292,7 +293,7 @@ class DisplayFrames():
 			self.mainWorkingGUI.graphicsScene.addPixmap(currentFrame)
 			self.mainWorkingGUI.graphicsView.fitInView(QtCore.QRectF(0,0,640,480), QtCore.Qt.KeepAspectRatio)
 
-			squareSide = 400 / self.mainWorkingGUI.precision #would be equal to 4px if a full sized frame were given to barycentre func
+			squareSide = 400 / self.mainWorkingGUI.precision #would be equal to 4px if a full sized frame was given to barycentre function
 			squareDims = QtCore.QRectF(bx - squareSide / 2, by - squareSide / 2, squareSide, squareSide)
 			self.mainWorkingGUI.graphicsScene.addRect(squareDims, QtGui.QPen(QtCore.Qt.green), QtGui.QBrush(QtCore.Qt.green))
 		else:
@@ -303,9 +304,9 @@ class DisplayFrames():
 
 
 	def closeEvent(self, event):
-		"""The custom close event. 
+		"""The custom closeEvent function. 
 		Asks the user to confirm the saving of his settings
-		and disconnect properly the camera.
+		and disconnects properly the camera.
 		"""
 		if self.mainWorkingGUI.isOkToClose():
 			self.displaying.stopCapture()
@@ -334,9 +335,9 @@ def main():
 	"""
 	import sys
 	app = QtGui.QApplication(sys.argv)
-	win = DisplayFrames()
-	win.mainWorkingGUI.show()
-	win.cameraUI.show()
+	prog = DisplayFrames()
+	prog.mainWorkingGUI.show()
+	prog.cameraUI.show()
 	sys.exit(app.exec_())
 
 
