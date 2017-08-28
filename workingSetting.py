@@ -244,9 +244,6 @@ class DisplayFrames():
 		"""
 		self.displaying.stopCapture()
 		time.sleep(self.CAM_RESPONSE_TIME)
-		try:
-			self.displaying.cam.release()
-		except AttributeError: pass
 		self.cameraUI.callCameraSetting()
 		self.initCam()
 
