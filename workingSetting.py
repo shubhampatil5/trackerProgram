@@ -297,7 +297,14 @@ class DisplayFrames():
 			self.mainWorkingGUI.graphicsScene.addPixmap(self.blackQPixmap)
 			self.mainWorkingGUI.graphicsView.fitInView(QtCore.QRectF(0,0,640,480), QtCore.Qt.KeepAspectRatio)
 
+		self.playMusic(bx, by)
 		self.mainWorkingGUI.graphicsScene.update()
+
+
+	def playMusic(self, bx, by):
+		""" This function play a music note depending on the barycentre position.
+		"""
+		pass
 
 
 	def closeEvent(self, event):
